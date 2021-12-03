@@ -1,7 +1,10 @@
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d h1:U+s90UTSYgptZMwQh2aRr3LuazLJIa+Pg3Kc1ylSYVY=
 github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d/go.mod h1:maD7wRr/U5Z6m/iR4s+kqSMx2CaBsrgA7czyZG/E6dU=
+github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
+github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dsoprea/go-exif v0.0.0-20210625224831-a6301f85c82b h1:hoVHc4m/v8Al8mbWyvKJWr4Z37yM4QUSVh/NY6A5Sbc=
+github.com/dsoprea/go-exif v0.0.0-20210625224831-a6301f85c82b/go.mod h1:lOaOt7+UEppOgyvRy749v3do836U/hw0YVJNjoyPaEs=
 github.com/dsoprea/go-exif/v2 v2.0.0-20200321225314-640175a69fe4 h1:bVaiYo8amn7Lu93sz6mTlYB3EtLG9aRcMnM1Eps8fmM=
 github.com/dsoprea/go-exif/v2 v2.0.0-20200321225314-640175a69fe4/go.mod h1:Lm2lMM2zx8p4a34ZemkaUV95AnMl4ZvLbCUbwOvLC2E=
 github.com/dsoprea/go-exif/v2 v2.0.0-20200604193436-ca8584a0e1c4 h1:Mg7pY7kxDQD2Bkvr1N+XW4BESSIQ7tTTR7Vv+Gi2CsM=
@@ -25,6 +28,8 @@ github.com/dsoprea/go-utility v0.0.0-20200711062821-fab8125e9bdf h1:/w4QxepU4AHh
 github.com/dsoprea/go-utility v0.0.0-20200711062821-fab8125e9bdf/go.mod h1:95+K3z2L0mqsVYd6yveIv1lmtT3tcQQ3dVakPySffW8=
 github.com/dsoprea/go-utility/v2 v2.0.0-20200717064901-2fccff4aa15e h1:IxIbA7VbCNrwumIYjDoMOdf4KOSkMC6NJE4s8oRbE7E=
 github.com/dsoprea/go-utility/v2 v2.0.0-20200717064901-2fccff4aa15e/go.mod h1:uAzdkPTub5Y9yQwXe8W4m2XuP0tK4a9Q/dantD0+uaU=
+github.com/gbdubs/attributions v0.0.0-20211113212559-c61d69e9213e h1:tGtPUJ0NiH78/OEwBI1AHRqUkH6GNdSnfrPS9BGKnZA=
+github.com/gbdubs/attributions v0.0.0-20211113212559-c61d69e9213e/go.mod h1:6cKW4k6dSaGS2602/DlDcUoEjvA7RDJMrKi8RuE0iyo=
 github.com/go-errors/errors v1.0.1/go.mod h1:f4zRHt4oKfwPJE5k8C9vpYG+aDHdBFUsgrm6/TyX73Q=
 github.com/go-errors/errors v1.0.2/go.mod h1:psDX2osz5VnTOnFWbDeWwS7yejl+uV3FEWEp4lssFEs=
 github.com/go-errors/errors v1.1.1 h1:ljK/pL5ltg3qoN+OtN6yCv9HWSfMwxSx90GJCZQxYNg=
