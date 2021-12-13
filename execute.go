@@ -23,7 +23,7 @@ func (input *Input) Execute() (*Output, error) {
 	n := input.NumberOfImages
 	a := input.FlickrAPIKey
 	if outputDir == "" {
-		outputDir = "/tmp/flickr_downloader"
+		outputDir = "/out/flickr_downloader"
 	}
 	folder := fmt.Sprintf("%s/%s", outputDir, q)
 	os.MkdirAll(folder, 0777)
@@ -36,7 +36,7 @@ func (input *Input) Execute() (*Output, error) {
 	for i, photo := range photos {
 		filePath := fmt.Sprintf("%s/%s_%d.jpeg", folder, q, i)
 		filePaths[i] = filePath
-		errChans[i] = photo.download(filePath, a)
+		errChans[i] = photo.downloadJpg(filePath)
 	}
 	for _, errChan := range errChans {
 		err = <-errChan
@@ -64,36 +64,56 @@ func getFirstFlickrResultsWithSearchTerm(query string, apiKey string, n int) ([]
 	// These rough bounds were just chosen as a reasonable performance tradeoffs
 	batchSize := 1
 	if n > 1 {
-		batchSize = 10
+		batchSize = 100
 	}
 	if n > 5 {
-		batchSize = 25
+		batchSize = 500
 	}
 	result := make([]*Photo, n, n)
 	uniqueOwners := make(map[string]bool)
 	found := 0
 	for _, license := range licensesInPreferredOrder {
-		photos, err := searchPhotos(query, apiKey, license, batchSize)
-		if err != nil {
-			return result, err
-		}
-		for _, p := range photos.Photos {
-			if !uniqueOwners[p.Owner] {
-				uniqueOwners[p.Owner] = true
-				result[found] = &p
-				found++
-				if found == n {
-					return result, nil
+		foundInLastBatch := batchSize
+		pageNumber := 1
+		for foundInLastBatch == batchSize {
+			ps, err := searchPhotos(query, apiKey, license, batchSize, pageNumber)
+			if err != nil {
+				return result, err
+			}
+			photos := make([]*Photo, len(ps.Photos))
+			errChans := make([]chan error, len(ps.Photos))
+			foundInLastBatch = len(ps.Photos)
+			for i, p := range ps.Photos {
+				photos[i] = &p
+				errChans[i] = photos[i].downloadInfo(apiKey)
+			}
+			for _, errChan := range errChans {
+				err = <-errChan
+				if err != nil {
+					return result, err
+				}
+			}
+			for _, p := range photos {
+				owner := p.PhotoInfo.Owner.Id
+				fmt.Printf("Owner = %s\n", owner)
+				if !uniqueOwners[owner] {
+					uniqueOwners[owner] = true
+					result[found] = p
+					found++
+					if found == n {
+						return result, nil
+					}
 				}
 			}
 		}
+
 	}
 	return result, nil
 }
 
 const API_ENDPOINT = "https://www.flickr.com/services/rest/"
 
-func searchPhotos(query string, apiKey string, license int, numToList int) (Photos, error) {
+func searchPhotos(query string, apiKey string, license int, pageSize int, pageNumber int) (Photos, error) {
 	req, err := http.NewRequest("GET", API_ENDPOINT, nil)
 	if err != nil {
 		return Photos{}, err
@@ -102,8 +122,11 @@ func searchPhotos(query string, apiKey string, license int, numToList int) (Phot
 	q.Add("method", "flickr.photos.search")
 	q.Add("api_key", apiKey)
 	q.Add("license", strconv.Itoa(license))
-	q.Add("per_page", strconv.Itoa(numToList))
+	q.Add("per_page", strconv.Itoa(pageSize))
+	q.Add("page", strconv.Itoa(pageNumber))
 	q.Add("text", query)
+	q.Add("media", "photos")
+	q.Add("sort", "interestingness-desc")
 	q.Add("format", "rest")
 	req.URL.RawQuery = q.Encode()
 	client := &http.Client{}
@@ -122,24 +145,6 @@ func searchPhotos(query string, apiKey string, license int, numToList int) (Phot
 		return Photos{}, err
 	}
 	return response.Photos, nil
-}
-
-func (p *Photo) download(imagePath string, apiKey string) chan error {
-	errChan := make(chan error)
-	jpgChan := p.downloadJpg(imagePath)
-	infoChan := p.downloadInfo(apiKey)
-	go func() {
-		if err := <-jpgChan; err != nil {
-			errChan <- err
-			return
-		}
-		if err := <-infoChan; err != nil {
-			errChan <- err
-			return
-		}
-		errChan <- p.setExifMetadata(imagePath)
-	}()
-	return errChan
 }
 
 func (p *Photo) downloadJpg(filePath string) chan error {
