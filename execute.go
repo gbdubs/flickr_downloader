@@ -22,21 +22,25 @@ func (input *Input) Execute() (*Output, error) {
 	q := input.Query
 	n := input.NumberOfImages
 	a := input.FlickrAPIKey
+	v := input.Verbose
+	izl := input.IncludeAllRightsReserved
 	if outputDir == "" {
 		outputDir = "/out/flickr_downloader"
 	}
 	folder := fmt.Sprintf("%s/%s", outputDir, q)
 	os.MkdirAll(folder, 0777)
-	photos, err := getFirstFlickrResultsWithSearchTerm(q, a, n)
+	photos, err := getFirstFlickrResultsWithSearchTerm(q, a, n, izl, v)
 	if err != nil {
 		return &Output{}, err
 	}
-	errChans := make([]chan error, n, n)
-	filePaths := make([]string, n, n)
+	n = len(photos)
+	errChans := make([]chan error, 2*n)
+	filePaths := make([]string, n)
 	for i, photo := range photos {
 		filePath := fmt.Sprintf("%s/%s_%d.jpeg", folder, q, i)
 		filePaths[i] = filePath
-		errChans[i] = photo.downloadJpg(filePath)
+		errChans[2*i] = photo.downloadJpg(filePath)
+		errChans[2*i+1] = photo.downloadInfo(a)
 	}
 	for _, errChan := range errChans {
 		err = <-errChan
@@ -59,7 +63,7 @@ func (input *Input) Execute() (*Output, error) {
 // Licenses in order of least restrictive to most restrictive.
 var licensesInPreferredOrder = [...]int{4, 5, 2, 1, 7, 6, 3, 9, 10, 8, 0}
 
-func getFirstFlickrResultsWithSearchTerm(query string, apiKey string, n int) ([]*Photo, error) {
+func getFirstFlickrResultsWithSearchTerm(query string, apiKey string, n int, includeZeroLicense bool, verbose bool) ([]*Photo, error) {
 	// We use different batch sizes because of the unique authorship constraints.
 	// These rough bounds were just chosen as a reasonable performance tradeoffs
 	batchSize := 1
@@ -73,29 +77,26 @@ func getFirstFlickrResultsWithSearchTerm(query string, apiKey string, n int) ([]
 	uniqueOwners := make(map[string]bool)
 	found := 0
 	for _, license := range licensesInPreferredOrder {
+		if license == 0 && !includeZeroLicense {
+			continue
+		}
 		foundInLastBatch := batchSize
 		pageNumber := 1
 		for foundInLastBatch == batchSize {
 			ps, err := searchPhotos(query, apiKey, license, batchSize, pageNumber)
+			if verbose {
+				fmt.Printf("  found %d photos in query for page %d with license %d. ", len(ps.Photos), pageNumber, license)
+			}
 			if err != nil {
 				return result, err
 			}
 			photos := make([]*Photo, len(ps.Photos))
-			errChans := make([]chan error, len(ps.Photos))
 			foundInLastBatch = len(ps.Photos)
 			for i, p := range ps.Photos {
 				photos[i] = &p
-				errChans[i] = photos[i].downloadInfo(apiKey)
-			}
-			for _, errChan := range errChans {
-				err = <-errChan
-				if err != nil {
-					return result, err
-				}
 			}
 			for _, p := range photos {
-				owner := p.PhotoInfo.Owner.Id
-				fmt.Printf("Owner = %s\n", owner)
+				owner := p.Ownername
 				if !uniqueOwners[owner] {
 					uniqueOwners[owner] = true
 					result[found] = p
@@ -104,11 +105,15 @@ func getFirstFlickrResultsWithSearchTerm(query string, apiKey string, n int) ([]
 						return result, nil
 					}
 				}
+
+			}
+			if verbose {
+				fmt.Printf("%d remaining. Unique Authors %v\n", n-found, uniqueOwners)
 			}
 		}
 
 	}
-	return result, nil
+	return result[:found], nil
 }
 
 const API_ENDPOINT = "https://www.flickr.com/services/rest/"
@@ -126,8 +131,9 @@ func searchPhotos(query string, apiKey string, license int, pageSize int, pageNu
 	q.Add("page", strconv.Itoa(pageNumber))
 	q.Add("text", query)
 	q.Add("media", "photos")
-	q.Add("sort", "interestingness-desc")
+	q.Add("sort", "relevance")
 	q.Add("format", "rest")
+	q.Add("extras", "owner_name")
 	req.URL.RawQuery = q.Encode()
 	client := &http.Client{}
 	resp, err := client.Do(req)

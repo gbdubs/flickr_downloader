@@ -21,6 +21,7 @@ type Photo struct {
 	Id        string   `xml:"id,attr"`
 	Owner     string   `xml:"owner,attr"`
 	Title     string   `xml:"title,attr"`
+	Ownername string   `xml:"ownername,attr"`
 	Secret    string   `xml:"secret,attr"`
 	Server    string   `xml:"server,attr"`
 	License   int

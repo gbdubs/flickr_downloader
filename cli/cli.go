@@ -37,6 +37,10 @@ func main() {
 				Usage:   "The Flickr API Key to charge usage to.",
 			},
 			&cli.BoolFlag{
+				Name:  "include_all_rights_reserved",
+				Usage: "Whether to allow for license = 0 (NOT open access) outputs.",
+			},
+			&cli.BoolFlag{
 				Name:  "verbose",
 				Usage: "Whether to print the output or silently succeed, if the command succeeds.",
 			},
@@ -54,10 +58,12 @@ func main() {
 			}
 			v := c.Bool("verbose")
 			input := &flickr_downloader.Input{
-				Query:          c.String("query"),
-				NumberOfImages: n,
-				OutputDir:      c.String("output_dir"),
-				FlickrAPIKey:   c.String("api_key"),
+				Query:                    c.String("query"),
+				NumberOfImages:           n,
+				OutputDir:                c.String("output_dir"),
+				FlickrAPIKey:             c.String("api_key"),
+				IncludeAllRightsReserved: c.Bool("include_all_rights_reserved"),
+				Verbose:                  v,
 			}
 			output, err := input.Execute()
 			if err != nil {
