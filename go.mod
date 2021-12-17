@@ -2,6 +2,8 @@ module github.com/gbdubs/flickr_downloader
 
 go 1.13
 
+replace github.com/gbdubs/attributions => ../attributions
+
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dsoprea/go-exif/v2 v2.0.0-20200604193436-ca8584a0e1c4

@@ -5,17 +5,13 @@ import "github.com/gbdubs/attributions"
 type Input struct {
 	FlickrAPIKey             string
 	Query                    string
-	NumberOfImages           int
-	IncludeAllRightsReserved bool
 	OutputDir                string
+	NumberOfImages           int
+	ForceReload              bool
+	IncludeAllRightsReserved bool
 	Verbose                  bool
 }
 
-type OutputFile struct {
-	OutputFilePath string
-	Attribution    attributions.Attribution
-}
-
 type Output struct {
-	OutputFiles []OutputFile
+	Files []attributions.AttributedFilePointer
 }

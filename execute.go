@@ -18,26 +18,40 @@ import (
 )
 
 func (input *Input) Execute() (*Output, error) {
-	outputDir := input.OutputDir
+	o := &Output{}
 	q := input.Query
 	n := input.NumberOfImages
 	a := input.FlickrAPIKey
 	v := input.Verbose
 	izl := input.IncludeAllRightsReserved
-	if outputDir == "" {
-		outputDir = "/out/flickr_downloader"
+	od := input.OutputDir
+	if od == "" {
+		od = fmt.Sprintf("/memo/flickr_downloader/%s", q)
 	}
-	folder := fmt.Sprintf("%s/%s", outputDir, q)
-	os.MkdirAll(folder, 0777)
+	err := os.MkdirAll(od, 0777)
+
+	if err != nil {
+		return o, fmt.Errorf("Error creating output directory at %s: %v", od, err)
+	}
+	alreadyExisting, err := attributions.ReadAllAttributedFilePointers(od)
+	if err != nil {
+		return o, fmt.Errorf("Error reading cached images at %s: %v", od, err)
+	}
+	if len(alreadyExisting) > 0 && !input.ForceReload {
+		o.Files = alreadyExisting
+		return o, nil
+	}
+
 	photos, err := getFirstFlickrResultsWithSearchTerm(q, a, n, izl, v)
 	if err != nil {
-		return &Output{}, err
+		return o, fmt.Errorf("Error calling flickr API with term %s: %v", q, err)
 	}
 	n = len(photos)
 	errChans := make([]chan error, 2*n)
 	filePaths := make([]string, n)
 	for i, photo := range photos {
-		filePath := fmt.Sprintf("%s/%s_%d.jpeg", folder, q, i)
+		fi := i + len(alreadyExisting)
+		filePath := fmt.Sprintf("%s/%s_%d.jpeg", od, q, fi)
 		filePaths[i] = filePath
 		errChans[2*i] = photo.downloadJpg(filePath)
 		errChans[2*i+1] = photo.downloadInfo(a)
@@ -45,19 +59,19 @@ func (input *Input) Execute() (*Output, error) {
 	for _, errChan := range errChans {
 		err = <-errChan
 		if err != nil {
-			return &Output{}, err
+			return o, fmt.Errorf("Error with secondary flickr api calls (info/jpg download): %v", err)
 		}
 	}
-	outputFiles := make([]OutputFile, n, n)
+	outputFiles := make([]attributions.AttributedFilePointer, n, n)
 	for i, filePath := range filePaths {
-		outputFiles[i] = OutputFile{
-			OutputFilePath: filePath,
-			Attribution:    *photos[i].attribution(),
+		afp, err := attributions.AttributeLocalFile(filePath, *photos[i].attribution())
+		if err != nil {
+			return o, fmt.Errorf("Error attributing file at %s: %v", filePath, err)
 		}
+		outputFiles[i] = afp
 	}
-	return &Output{
-		OutputFiles: outputFiles,
-	}, nil
+	o.Files = outputFiles
+	return o, nil
 }
 
 // Licenses in order of least restrictive to most restrictive.
@@ -105,11 +119,11 @@ func getFirstFlickrResultsWithSearchTerm(query string, apiKey string, n int, inc
 						return result, nil
 					}
 				}
-
 			}
 			if verbose {
 				fmt.Printf("%d remaining. Unique Authors %v\n", n-found, uniqueOwners)
 			}
+			pageNumber++
 		}
 
 	}

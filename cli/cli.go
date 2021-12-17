@@ -37,6 +37,10 @@ func main() {
 				Usage:   "The Flickr API Key to charge usage to.",
 			},
 			&cli.BoolFlag{
+				Name:  "force_reload",
+				Usage: "Whether to get additional images, even if the output directory already contains results.",
+			},
+			&cli.BoolFlag{
 				Name:  "include_all_rights_reserved",
 				Usage: "Whether to allow for license = 0 (NOT open access) outputs.",
 			},
@@ -63,6 +67,7 @@ func main() {
 				OutputDir:                c.String("output_dir"),
 				FlickrAPIKey:             c.String("api_key"),
 				IncludeAllRightsReserved: c.Bool("include_all_rights_reserved"),
+				ForceReload:              c.Bool("force_reload"),
 				Verbose:                  v,
 			}
 			output, err := input.Execute()
