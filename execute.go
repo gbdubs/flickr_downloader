@@ -15,9 +15,10 @@ import (
 	"github.com/dsoprea/go-exif/v2"
 	jpegstructure "github.com/dsoprea/go-jpeg-image-structure"
 	"github.com/gbdubs/attributions"
+	"github.com/google/uuid"
 )
 
-func (input *Input) Execute() (*Output, error) {
+func (input *Input) execute() (*Output, error) {
 	o := &Output{}
 	q := input.Query
 	n := input.NumberOfImages
@@ -50,8 +51,8 @@ func (input *Input) Execute() (*Output, error) {
 	errChans := make([]chan error, 2*n)
 	filePaths := make([]string, n)
 	for i, photo := range photos {
-		fi := i + len(alreadyExisting)
-		filePath := fmt.Sprintf("%s/%s_%d.jpeg", od, q, fi)
+		id := uuid.New().String()
+		filePath := fmt.Sprintf("%s/%s.jpeg", od, id)
 		filePaths[i] = filePath
 		errChans[2*i] = photo.downloadJpg(filePath)
 		errChans[2*i+1] = photo.downloadInfo(a)
@@ -62,13 +63,13 @@ func (input *Input) Execute() (*Output, error) {
 			return o, fmt.Errorf("Error with secondary flickr api calls (info/jpg download): %v", err)
 		}
 	}
-	outputFiles := make([]attributions.AttributedFilePointer, n, n)
+	outputFiles := make([]attributions.AttributedFilePointer, 0)
 	for i, filePath := range filePaths {
 		afp, err := attributions.AttributeLocalFile(filePath, *photos[i].attribution())
 		if err != nil {
 			return o, fmt.Errorf("Error attributing file at %s: %v", filePath, err)
 		}
-		outputFiles[i] = afp
+		outputFiles = append(outputFiles, afp)
 	}
 	o.Files = outputFiles
 	return o, nil
@@ -99,15 +100,16 @@ func getFirstFlickrResultsWithSearchTerm(query string, apiKey string, n int, inc
 		for foundInLastBatch == batchSize {
 			ps, err := searchPhotos(query, apiKey, license, batchSize, pageNumber)
 			if verbose {
-				fmt.Printf("  found %d photos in query for page %d with license %d. ", len(ps.Photos), pageNumber, license)
+				fmt.Printf("  found %d photos in page %d for query %s with license %d. ", len(ps.Photos), pageNumber, query, license)
 			}
 			if err != nil {
 				return result, err
 			}
 			photos := make([]*Photo, len(ps.Photos))
 			foundInLastBatch = len(ps.Photos)
-			for i, p := range ps.Photos {
-				photos[i] = &p
+			for i, _ := range ps.Photos {
+				// OOOH TRICKSY POINTERSES WE HATES THEM WE DO
+				photos[i] = &ps.Photos[i]
 			}
 			for _, p := range photos {
 				owner := p.Ownername
@@ -121,7 +123,7 @@ func getFirstFlickrResultsWithSearchTerm(query string, apiKey string, n int, inc
 				}
 			}
 			if verbose {
-				fmt.Printf("%d remaining. Unique Authors %v\n", n-found, uniqueOwners)
+				fmt.Printf("%d remaining. %d unique authors so far.\n", n-found, len(uniqueOwners))
 			}
 			pageNumber++
 		}

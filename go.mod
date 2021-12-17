@@ -11,5 +11,6 @@ require (
 	github.com/dsoprea/go-jpeg-image-structure v0.0.0-20210512043942-b434301c6836
 	github.com/dsoprea/go-logging v0.0.0-20200710184922-b02d349568dd // indirect
 	github.com/gbdubs/attributions v0.0.0-20211113212559-c61d69e9213e // indirect
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/urfave/cli/v2 v2.3.0
 )

@@ -15,3 +15,7 @@ type Input struct {
 type Output struct {
 	Files []attributions.AttributedFilePointer
 }
+
+func (i *Input) Execute() (*Output, error) {
+	return i.execute()
+}
