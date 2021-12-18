@@ -61,6 +61,10 @@ func main() {
 				n = 1
 			}
 			v := c.Bool("verbose")
+			vi := -1
+			if v {
+				vi = 0
+			}
 			input := &flickr_downloader.Input{
 				Query:                    c.String("query"),
 				NumberOfImages:           n,
@@ -68,7 +72,7 @@ func main() {
 				FlickrAPIKey:             c.String("api_key"),
 				IncludeAllRightsReserved: c.Bool("include_all_rights_reserved"),
 				ForceReload:              c.Bool("force_reload"),
-				Verbose:                  v,
+				VerboseIndent:            vi,
 			}
 			output, err := input.Execute()
 			if err != nil {

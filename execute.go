@@ -1,9 +1,7 @@
 package flickr_downloader
 
 import (
-	"bytes"
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -12,22 +10,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/dsoprea/go-exif/v2"
-	jpegstructure "github.com/dsoprea/go-jpeg-image-structure"
 	"github.com/gbdubs/attributions"
 	"github.com/google/uuid"
 )
 
 func (input *Input) execute() (*Output, error) {
 	o := &Output{}
-	q := input.Query
-	n := input.NumberOfImages
-	a := input.FlickrAPIKey
-	v := input.Verbose
-	izl := input.IncludeAllRightsReserved
 	od := input.OutputDir
 	if od == "" {
-		od = fmt.Sprintf("/memo/flickr_downloader/%s", q)
+		od = fmt.Sprintf("/memo/flickr_downloader/%s", input.Query)
 	}
 	err := os.MkdirAll(od, 0777)
 
@@ -43,11 +34,11 @@ func (input *Input) execute() (*Output, error) {
 		return o, nil
 	}
 
-	photos, err := getFirstFlickrResultsWithSearchTerm(q, a, n, izl, v)
+	photos, err := input.getFlickrSearchResults()
 	if err != nil {
-		return o, fmt.Errorf("Error calling flickr API with term %s: %v", q, err)
+		return o, fmt.Errorf("Error calling flickr API with term %s: %v", input.Query, err)
 	}
-	n = len(photos)
+	n := len(photos)
 	errChans := make([]chan error, 2*n)
 	filePaths := make([]string, n)
 	for i, photo := range photos {
@@ -55,7 +46,7 @@ func (input *Input) execute() (*Output, error) {
 		filePath := fmt.Sprintf("%s/%s.jpeg", od, id)
 		filePaths[i] = filePath
 		errChans[2*i] = photo.downloadJpg(filePath)
-		errChans[2*i+1] = photo.downloadInfo(a)
+		errChans[2*i+1] = photo.downloadInfo(input.FlickrAPIKey)
 	}
 	for _, errChan := range errChans {
 		err = <-errChan
@@ -78,7 +69,8 @@ func (input *Input) execute() (*Output, error) {
 // Licenses in order of least restrictive to most restrictive.
 var licensesInPreferredOrder = [...]int{4, 5, 2, 1, 7, 6, 3, 9, 10, 8, 0}
 
-func getFirstFlickrResultsWithSearchTerm(query string, apiKey string, n int, includeZeroLicense bool, verbose bool) ([]*Photo, error) {
+func (input *Input) getFlickrSearchResults() ([]*Photo, error) {
+	n := input.NumberOfImages
 	// We use different batch sizes because of the unique authorship constraints.
 	// These rough bounds were just chosen as a reasonable performance tradeoffs
 	batchSize := 1
@@ -92,16 +84,14 @@ func getFirstFlickrResultsWithSearchTerm(query string, apiKey string, n int, inc
 	uniqueOwners := make(map[string]bool)
 	found := 0
 	for _, license := range licensesInPreferredOrder {
-		if license == 0 && !includeZeroLicense {
+		if license == 0 && input.IncludeAllRightsReserved {
 			continue
 		}
 		foundInLastBatch := batchSize
 		pageNumber := 1
 		for foundInLastBatch == batchSize {
-			ps, err := searchPhotos(query, apiKey, license, batchSize, pageNumber)
-			if verbose {
-				fmt.Printf("  found %d photos in page %d for query %s with license %d. ", len(ps.Photos), pageNumber, query, license)
-			}
+			ps, err := input.searchPhotos(license, batchSize, pageNumber)
+			input.verbose("found %d photos in page %d for query %s with license %d. ", len(ps.Photos), pageNumber, input.Query, license)
 			if err != nil {
 				return result, err
 			}
@@ -122,9 +112,7 @@ func getFirstFlickrResultsWithSearchTerm(query string, apiKey string, n int, inc
 					}
 				}
 			}
-			if verbose {
-				fmt.Printf("%d remaining. %d unique authors so far.\n", n-found, len(uniqueOwners))
-			}
+			input.verbose("%d remaining. %d unique authors so far.\n", n-found, len(uniqueOwners))
 			pageNumber++
 		}
 
@@ -134,18 +122,18 @@ func getFirstFlickrResultsWithSearchTerm(query string, apiKey string, n int, inc
 
 const API_ENDPOINT = "https://www.flickr.com/services/rest/"
 
-func searchPhotos(query string, apiKey string, license int, pageSize int, pageNumber int) (Photos, error) {
+func (input *Input) searchPhotos(license int, pageSize int, pageNumber int) (Photos, error) {
 	req, err := http.NewRequest("GET", API_ENDPOINT, nil)
 	if err != nil {
 		return Photos{}, err
 	}
 	q := req.URL.Query()
 	q.Add("method", "flickr.photos.search")
-	q.Add("api_key", apiKey)
+	q.Add("api_key", input.FlickrAPIKey)
 	q.Add("license", strconv.Itoa(license))
 	q.Add("per_page", strconv.Itoa(pageSize))
 	q.Add("page", strconv.Itoa(pageNumber))
-	q.Add("text", query)
+	q.Add("text", input.Query)
 	q.Add("media", "photos")
 	q.Add("sort", "relevance")
 	q.Add("format", "rest")
@@ -247,120 +235,4 @@ func (p *Photo) attribution() *attributions.Attribution {
 		Context:             []string{i.Description},
 		ScrapingMethodology: "github.com/gbdubs/flickr_downloader",
 	}
-}
-
-func (p *Photo) setExifMetadata(jpegPath string) error {
-	photo := p.PhotoInfo
-	jmp := jpegstructure.NewJpegMediaParser()
-	intfc, err := jmp.ParseFile(jpegPath)
-	if err != nil {
-		return err
-	}
-	sl := intfc.(*jpegstructure.SegmentList)
-	rootIb, err := sl.ConstructExifBuilder()
-	if err != nil {
-		return err
-	}
-	// IFD0 Block
-	ifd0Path := "IFD0"
-	ifd0Ib, err := exif.GetOrCreateIbFromRootIb(rootIb, ifd0Path)
-	if err != nil {
-		return err
-	}
-	// Artist
-	artist := fmt.Sprintf("%s (on flickr @%s)", photo.Owner.RealName, photo.Owner.UserName)
-	err = ifd0Ib.SetStandardWithName("Artist", artist)
-	if err != nil {
-		return err
-	}
-	// Copyright
-	copyright := photo.getLicenseDescription()
-	err = ifd0Ib.SetStandardWithName("Copyright", copyright)
-	if err != nil {
-		return err
-	}
-	// Description
-	description := fmt.Sprintf("%s\n%s\n%s", photo.Title, photo.Description, photo.FlickrUrl)
-	err = ifd0Ib.SetStandardWithName("ImageDescription", description)
-	if err != nil {
-		return err
-	}
-	// DateTime - this is the time that the content was downloaded, not the time it was created.
-	// this is largely to provide a point-in-time snapshot to point to if asked about when
-	// content was scraped.
-	dateTime := exif.ExifFullTimestampString(time.Unix(photo.DateUploaded, 0))
-	err = ifd0Ib.SetStandardWithName("DateTime", dateTime)
-	if err != nil {
-		return err
-	}
-	err = sl.SetExif(rootIb)
-	if err != nil {
-		return err
-	}
-	b := bytes.NewBufferString("")
-	err = sl.Write(b)
-	if err != nil {
-		return err
-	}
-	return ioutil.WriteFile(jpegPath, b.Bytes(), 0666)
-}
-
-func (photo *PhotoInfo) getLicenseDescription() string {
-	return fmt.Sprintf("%s (%s)", photo.getLicenseName(), photo.getLicenseLink())
-}
-
-func (photo *PhotoInfo) getLicenseName() string {
-	switch photo.License {
-	case 0:
-		return "All Rights Reserved"
-	case 1:
-		return "Attribution-NonCommercial-ShareAlike License"
-	case 2:
-		return "Attribution-NonCommercial License"
-	case 3:
-		return "Attribution-NonCommercial-NoDerivs License"
-	case 4:
-		return "Attribution License"
-	case 5:
-		return "Attribution-ShareAlike License"
-	case 6:
-		return "Attribution-NoDerivs License"
-	case 7:
-		return "No known copyright restrictions"
-	case 8:
-		return "United States Government Work"
-	case 9:
-		return "Public Domain Dedication (CC0)"
-	case 10:
-		return "Public Domain Mark"
-	}
-	panic(errors.New(fmt.Sprintf("Unknown License Number: %d", photo.License)))
-}
-
-func (photo *PhotoInfo) getLicenseLink() string {
-	switch photo.License {
-	case 0:
-		return ""
-	case 1:
-		return "https://creativecommons.org/licenses/by-nc-sa/2.0/"
-	case 2:
-		return "https://creativecommons.org/licenses/by-nc/2.0/"
-	case 3:
-		return "https://creativecommons.org/licenses/by-nc-nd/2.0/"
-	case 4:
-		return "https://creativecommons.org/licenses/by/2.0/"
-	case 5:
-		return "https://creativecommons.org/licenses/by-sa/2.0/"
-	case 6:
-		return "https://creativecommons.org/licenses/by-nd/2.0/"
-	case 7:
-		return "https://www.flickr.com/commons/usage/"
-	case 8:
-		return "http://www.usa.gov/copyright.shtml"
-	case 9:
-		return "https://creativecommons.org/publicdomain/zero/1.0/"
-	case 10:
-		return "https://creativecommons.org/publicdomain/mark/1.0/"
-	}
-	panic(errors.New(fmt.Sprintf("Unknown License Number: %d", photo.License)))
 }

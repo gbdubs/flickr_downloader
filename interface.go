@@ -9,7 +9,7 @@ type Input struct {
 	NumberOfImages           int
 	ForceReload              bool
 	IncludeAllRightsReserved bool
-	Verbose                  bool
+	VerboseIndent            int
 }
 
 type Output struct {
