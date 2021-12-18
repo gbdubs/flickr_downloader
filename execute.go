@@ -91,7 +91,7 @@ func (input *Input) getFlickrSearchResults() ([]*Photo, error) {
 		pageNumber := 1
 		for foundInLastBatch == batchSize {
 			ps, err := input.searchPhotos(license, batchSize, pageNumber)
-			input.verbose("found %d photos in page %d for query %s with license %d. ", len(ps.Photos), pageNumber, input.Query, license)
+			input.VLog("found %d photos in page %d for query %s with license %d. ", len(ps.Photos), pageNumber, input.Query, license)
 			if err != nil {
 				return result, err
 			}
@@ -112,7 +112,7 @@ func (input *Input) getFlickrSearchResults() ([]*Photo, error) {
 					}
 				}
 			}
-			input.verbose("%d remaining. %d unique authors so far.\n", n-found, len(uniqueOwners))
+			input.VLog("%d remaining. %d unique authors so far.\n", n-found, len(uniqueOwners))
 			pageNumber++
 		}
 

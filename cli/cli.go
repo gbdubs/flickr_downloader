@@ -5,8 +5,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/gbdubs/flickr_downloader"
+	"github.com/gbdubs/verbose"
 	"github.com/urfave/cli/v2"
 )
 
@@ -60,11 +60,7 @@ func main() {
 			if n <= 0 {
 				n = 1
 			}
-			v := c.Bool("verbose")
-			vi := -1
-			if v {
-				vi = 0
-			}
+
 			input := &flickr_downloader.Input{
 				Query:                    c.String("query"),
 				NumberOfImages:           n,
@@ -72,15 +68,13 @@ func main() {
 				FlickrAPIKey:             c.String("api_key"),
 				IncludeAllRightsReserved: c.Bool("include_all_rights_reserved"),
 				ForceReload:              c.Bool("force_reload"),
-				VerboseIndent:            vi,
+				Verbose:                  verbose.NewOrEmpty(c.Bool("verbose")),
 			}
 			output, err := input.Execute()
 			if err != nil {
 				return err
 			}
-			if v {
-				spew.Dump(*output)
-			}
+			input.VDump(output)
 			return nil
 		},
 	}

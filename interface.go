@@ -1,6 +1,9 @@
 package flickr_downloader
 
-import "github.com/gbdubs/attributions"
+import (
+	"github.com/gbdubs/attributions"
+	"github.com/gbdubs/verbose"
+)
 
 type Input struct {
 	FlickrAPIKey             string
@@ -9,7 +12,7 @@ type Input struct {
 	NumberOfImages           int
 	ForceReload              bool
 	IncludeAllRightsReserved bool
-	VerboseIndent            int
+	verbose.Verbose
 }
 
 type Output struct {
