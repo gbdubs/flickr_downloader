@@ -84,14 +84,16 @@ func (input *Input) getFlickrSearchResults() ([]*Photo, error) {
 	uniqueOwners := make(map[string]bool)
 	found := 0
 	for _, license := range licensesInPreferredOrder {
-		if license == 0 && input.IncludeAllRightsReserved {
+		if license == 0 && !input.IncludeAllRightsReserved {
 			continue
 		}
 		foundInLastBatch := batchSize
 		pageNumber := 1
 		for foundInLastBatch == batchSize {
 			ps, err := input.searchPhotos(license, batchSize, pageNumber)
-			input.VLog("found %d photos in page %d for query %s with license %d. ", len(ps.Photos), pageNumber, input.Query, license)
+			if len(ps.Photos) > 0 {
+				input.VLog("found %d photos in page %d for query %s with license %d. ", len(ps.Photos), pageNumber, input.Query, license)
+			}
 			if err != nil {
 				return result, err
 			}
@@ -112,7 +114,9 @@ func (input *Input) getFlickrSearchResults() ([]*Photo, error) {
 					}
 				}
 			}
-			input.VLog("%d remaining. %d unique authors so far.\n", n-found, len(uniqueOwners))
+			if len(photos) > 0 {
+				input.VLog("%d remaining. %d unique authors so far.\n", n-found, len(uniqueOwners))
+			}
 			pageNumber++
 		}
 
@@ -152,6 +156,7 @@ func (input *Input) searchPhotos(license int, pageSize int, pageNumber int) (Pho
 	var response Response
 	err = xml.Unmarshal(respAsBytes, &response)
 	if err != nil {
+		fmt.Printf("\n\n%s\n\n", string(respAsBytes))
 		return Photos{}, err
 	}
 	return response.Photos, nil
@@ -212,6 +217,7 @@ func (p *Photo) downloadInfo(apiKey string) chan error {
 		var response Response
 		err = xml.Unmarshal(respAsBytes, &response)
 		if err != nil {
+			fmt.Printf("RESPONSE\n\n%s\n\n", string(respAsBytes))
 			errChan <- err
 			return
 		}
